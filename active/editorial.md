@@ -39,7 +39,7 @@ Nmap done: 1 IP address (1 host up) scanned in 68.16 seconds
 Username: dev\nPassword: dev080217_devAPI!@
 ```
 ## Post exploitation
->uses git version control, found a version using git log, it contains `prod` user credentials
+>uses git version control, found a version using `git log`, it contains `prod` user credentials
 >
 
 ```shell
